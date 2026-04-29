@@ -140,13 +140,16 @@ function calcularNomina(inputs: InputsNomina, config: ConfigNomina): ResultadoNo
     ? config.auxilioTransporte * (diasTrabajados / 30) 
     : 0
   
+  // Parafiscales aplican solo cuando el salario base supera 10 SMMLV
+  const aplicaParafiscales = salarioBase > 10 * config.smmlv
+
   // Recargos por hora
   const valorHorasExtraDiurnas = horasExtraDiurnas * valorHora * 1.25
   const valorHorasExtraNocturnas = horasExtraNocturnas * valorHora * 1.75
   const valorRecargosNocturnos = recargosNocturnos * valorHora * 1.35
   const valorHorasDominicalesDiurnas = horasDominicalesDiurnas * valorHora * 2.00
   const valorHorasDominicalesNocturnas = horasDominicalesNocturnas * valorHora * 2.50
-  
+
   const totalHorasExtra = valorHorasExtraDiurnas + valorHorasExtraNocturnas + 
     valorRecargosNocturnos + valorHorasDominicalesDiurnas + valorHorasDominicalesNocturnas
   
@@ -181,8 +184,8 @@ function calcularNomina(inputs: InputsNomina, config: ConfigNomina): ResultadoNo
   const pensionEmpleador = baseCotizacion * 0.12
   const arl = baseCotizacion * (porcentajeArl / 100)
   const caja = config.aplicarCaja ? baseCotizacion * 0.04 : 0
-  const icbf = config.aplicarICBF ? baseCotizacion * 0.03 : 0
-  const sena = config.aplicarSENA ? baseCotizacion * 0.02 : 0
+  const icbf = config.aplicarICBF && aplicaParafiscales ? baseCotizacion * 0.03 : 0
+  const sena = config.aplicarSENA && aplicaParafiscales ? baseCotizacion * 0.02 : 0
   
   const totalAportesEmpleador = saludEmpleador + pensionEmpleador + arl + caja + icbf + sena
   
@@ -323,6 +326,16 @@ function Formulario({ inputs, setInputs, config, setConfig, onCalcular }: Formul
   }
   
   const handleInputChange = (field: keyof InputsNomina, value: string | number) => {
+    if (field === 'diasTrabajados') {
+      const parsedValue = typeof value === 'string' ? parseNumericValue(value) : Number(value)
+      const clampedValue = parsedValue > 30 ? 30 : parsedValue
+      if (parsedValue > 30) {
+        alert('El máximo de días permitidos por periodo mensual es 30.')
+      }
+      setInputs(prev => ({ ...prev, diasTrabajados: clampedValue }))
+      return
+    }
+
     if (typeof value === 'string' && field !== 'nombre' && field !== 'nivelArl') {
       setInputs(prev => ({ ...prev, [field]: parseNumericValue(value) }))
     } else {
@@ -660,11 +673,14 @@ function Formulario({ inputs, setInputs, config, setConfig, onCalcular }: Formul
                     </label>
                   </div>
                 </div>
+                <p className="small text-muted mt-2" style={{ lineHeight: 1.4 }}>
+                  SENA e ICBF no se calculan cuando el salario base es igual o inferior a 10 SMMLV. El auxilio de transporte se aplica automáticamente para salarios hasta 2 SMMLV.
+                </p>
               </div>
             </div>
           </div>
         </div>
-        
+
         <button
           className="btn w-100 mt-4 fw-bold"
           style={{ 
